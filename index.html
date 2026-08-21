@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CE Prompt Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <span class="logo-emoji">💬</span>
+      <h1>CE Prompt Hub</h1>
+    </header>
+
+    <main class="app-main">
+      <!-- Doc Source Selection (visible when folder URL is present) -->
+      <div id="docSelectContainer" class="form-group" style="display: none;">
+        <label for="docSelect">Doc Source:</label>
+        <select id="docSelect" class="form-input"></select>
+      </div>
+
+      <!-- Role Selection -->
+      <div class="form-group">
+        <label for="roleSelect">Select a Role:</label>
+        <select id="roleSelect" class="form-input">
+          <option value="">-- None --</option>
+        </select>
+      </div>
+
+      <!-- Prompt Selection Combobox -->
+      <div class="form-group">
+        <label for="promptSearch">Search or Select Prompt:</label>
+        <div class="combobox-container">
+          <input type="text" id="promptSearch" class="form-input combobox-input" placeholder="Search or select prompt..." autocomplete="off">
+          <div id="promptDropdown" class="combobox-dropdown"></div>
+        </div>
+      </div>
+
+      <!-- Dynamic Placeholders Container -->
+      <div id="dynamicInputs" class="dynamic-inputs-area"></div>
+
+      <!-- Combined Prompt Text Editor -->
+      <div class="form-group editor-group">
+        <label for="promptBox">Edit Prompt:</label>
+        <textarea id="promptBox" placeholder="Your compiled prompt will appear here..."></textarea>
+      </div>
+
+      <!-- Bottom Actions -->
+      <div class="button-row">
+        <button id="copyBtn" class="btn btn-primary">
+          <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" fill="currentColor"/>
+          </svg>
+          <span id="copyBtnText">Copy Prompt</span>
+        </button>
+        <button id="clearBtn" class="btn btn-secondary">
+          <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/>
+          </svg>
+          <span>Clear</span>
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Load variables dynamically, then load app logic -->
+  <script src="env.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
