@@ -24,6 +24,9 @@ jobs:
         run: |
           sed -i 's/?v=1.0.0/?v=${{ github.run_id }}/g' index.html
 
+      - name: Remove Gitignore for Deployment
+        run: rm -f .gitignore
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
