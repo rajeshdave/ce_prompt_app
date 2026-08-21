@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CE Prompt Hub</title>
+  <link rel="icon" type="image/png" sizes="16x16" href="images/icon16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="images/icon48.png">
+  <link rel="icon" type="image/svg+xml" href="images/icon.svg">
+  <link rel="apple-touch-icon" href="images/icon128.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -23,14 +27,6 @@
         <select id="docSelect" class="form-input"></select>
       </div>
 
-      <!-- Role Selection -->
-      <div class="form-group">
-        <label for="roleSelect">Select a Role:</label>
-        <select id="roleSelect" class="form-input">
-          <option value="">-- None --</option>
-        </select>
-      </div>
-
       <!-- Prompt Selection Combobox -->
       <div class="form-group">
         <label for="promptSearch">Search or Select Prompt:</label>
@@ -42,6 +38,14 @@
 
       <!-- Dynamic Placeholders Container -->
       <div id="dynamicInputs" class="dynamic-inputs-area"></div>
+
+      <!-- Role Selection -->
+      <div class="form-group">
+        <label for="roleSelect">Select a Role:</label>
+        <select id="roleSelect" class="form-input">
+          <option value="">-- None --</option>
+        </select>
+      </div>
 
       <!-- Combined Prompt Text Editor -->
       <div class="form-group editor-group">
