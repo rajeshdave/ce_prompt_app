@@ -42,46 +42,70 @@ function extractFolderId(url) {
 }
 
 // Fetch list of Google Doc files from a public Google Drive folder
+// Fetch list of Google Doc files from a public Google Drive folder
 async function listFilesInFolder(folderId) {
   if (folderCache[folderId]) {
     return folderCache[folderId];
   }
   
-  const url = `https://drive.google.com/embeddedfolderview?id=${folderId}`;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error(`Failed to fetch folder, status: ${response.status}`);
+  const apiUrl = window.ENV ? window.ENV.API_URL : null;
+  
+  if (apiUrl) {
+    const url = `${apiUrl}?action=list&folderId=${folderId}`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Failed to fetch folder, status: ${response.status}`);
+        return [];
+      }
+      const files = await response.json();
+      if (files.error) {
+        console.error("API returned error:", files.error);
+        return [];
+      }
+      folderCache[folderId] = files;
+      return files;
+    } catch (error) {
+      console.error("Error listing files in folder via API:", error);
       return [];
     }
-    const htmlText = await response.text();
-    
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlText, 'text/html');
-    const aTags = doc.querySelectorAll('a');
-    
-    const files = [];
-    const seenIds = new Set();
-    
-    aTags.forEach(a => {
-      const href = a.getAttribute('href') || '';
-      const text = a.textContent.trim();
-      
-      const match = href.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]{25,})/);
-      if (match) {
-        const id = match[1];
-        if (!seenIds.has(id) && text) {
-          seenIds.add(id);
-          files.push({ id: id, name: text });
-        }
+  } else {
+    const url = `https://drive.google.com/embeddedfolderview?id=${folderId}`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Failed to fetch folder, status: ${response.status}`);
+        return [];
       }
-    });
-    
-    folderCache[folderId] = files;
-    return files;
-  } catch (error) {
-    console.error("Error listing files in folder:", error);
-    return [];
+      const htmlText = await response.text();
+      
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const aTags = doc.querySelectorAll('a');
+      
+      const files = [];
+      const seenIds = new Set();
+      
+      aTags.forEach(a => {
+        const href = a.getAttribute('href') || '';
+        const text = a.textContent.trim();
+        
+        const match = href.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]{25,})/);
+        if (match) {
+          const id = match[1];
+          if (!seenIds.has(id) && text) {
+            seenIds.add(id);
+            files.push({ id: id, name: text });
+          }
+        }
+      });
+      
+      folderCache[folderId] = files;
+      return files;
+    } catch (error) {
+      console.error("Error listing files in folder directly:", error);
+      return [];
+    }
   }
 }
 
@@ -151,10 +175,24 @@ async function parsePrompts(text) {
                   docSelect.value = activeDocId;
                   localStorage.setItem("ce_selected_doc_id", activeDocId);
                   
-                  const activeFileUrl = `https://docs.google.com/document/d/${activeDocId}/export?format=txt`;
-                  const activeRes = await fetch(activeFileUrl);
-                  if (activeRes.ok) {
-                    const docText = await activeRes.text();
+                  const apiUrl = window.ENV ? window.ENV.API_URL : null;
+                  let docText = "";
+                  
+                  if (apiUrl) {
+                    const activeFileUrl = `${apiUrl}?action=get&docId=${activeDocId}`;
+                    const activeRes = await fetch(activeFileUrl);
+                    if (activeRes.ok) {
+                      docText = await activeRes.text();
+                    }
+                  } else {
+                    const activeFileUrl = `https://docs.google.com/document/d/${activeDocId}/export?format=txt`;
+                    const activeRes = await fetch(activeFileUrl);
+                    if (activeRes.ok) {
+                      docText = await activeRes.text();
+                    }
+                  }
+                  
+                  if (docText) {
                     const docPrompts = await parsePrompts(docText);
                     prompts.push(...docPrompts);
                   }
@@ -175,14 +213,27 @@ async function parsePrompts(text) {
             }
           } else {
             // Standard single file URL
-            const fetchUrl = getDownloadUrl(url);
-            const response = await fetch(fetchUrl);
-            if (response.ok) {
-              const externalText = await response.text();
+            const apiUrl = window.ENV ? window.ENV.API_URL : null;
+            let externalText = "";
+            
+            const docMatch = url.match(/document\/d\/([a-zA-Z0-9_-]{25,})/);
+            if (apiUrl && docMatch) {
+              const docId = docMatch[1];
+              const response = await fetch(`${apiUrl}?action=get&docId=${docId}`);
+              if (response.ok) {
+                externalText = await response.text();
+              }
+            } else {
+              const fetchUrl = getDownloadUrl(url);
+              const response = await fetch(fetchUrl);
+              if (response.ok) {
+                externalText = await response.text();
+              }
+            }
+            
+            if (externalText) {
               const externalPrompts = await parsePrompts(externalText);
               prompts.push(...externalPrompts);
-            } else {
-              console.error(`Failed to fetch prompts from URL: ${url} - Status: ${response.status}`);
             }
           }
         } catch (error) {

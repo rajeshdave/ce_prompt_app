@@ -18,7 +18,7 @@ jobs:
 
       - name: Inject Environment Variables
         run: |
-          echo 'window.ENV = { FOLDER_URL: "${{ secrets.PROMPT_FOLDER_URL }}" };' > env.js
+          echo 'window.ENV = { FOLDER_URL: "${{ secrets.PROMPT_FOLDER_URL }}", API_URL: "${{ secrets.SCRIPT_API_URL }}" };' > env.js
 
       - name: Auto-Version Assets (Cache Busting)
         run: |

@@ -17,9 +17,10 @@ This project was designed and implemented by **Gemini** (using the human-friendl
 
 During the design phase, the following architectural choices were made to keep the codebase clean, performant, and secure:
 
-1.  **Direct Folder Syncing**:
-    *   Unlike traditional solutions that require a Google Cloud Developer account or service keys, this app fetches public Google Drive folders using a lightweight HTML scraper targeting the `embeddedfolderview` endpoint.
-    *   It extracts files matching Google Docs URLs, lists them, and populates the **Doc Source** selection dropdown automatically.
+1.  **CORS-Compliant Sync API**:
+    *   To bypass standard browser CORS blocks when running on `github.io`, the app connects to a lightweight, free Google Apps Script web app proxy deployed under the owner's Google account.
+    *   This API lists files inside the public folder and extracts raw document text directly, adding the necessary `Access-Control-Allow-Origin: *` headers for browser support.
+    *   For local or extension-based testing, the app automatically falls back to direct HTML scraping if the API URL is omitted.
 2.  **No Maintenance (No Provider APIs)**:
     *   To prevent the app from breaking when AI providers (like OpenAI, Google Gemini, Anthropic Claude, or Perplexity) update their DOM structures, the app does not interact with the providers' pages directly.
     *   Instead, it compiles the prompt and copies it to the browser's clipboard, providing a clean copy-and-paste interface.
