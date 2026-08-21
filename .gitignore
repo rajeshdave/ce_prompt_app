@@ -1,6 +1,0 @@
-# Ignore environment files
-env.js
-
-# OS specific files
-.DS_Store
-Thumbs.db

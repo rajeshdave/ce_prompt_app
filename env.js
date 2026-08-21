@@ -1,0 +1,1 @@
+window.ENV = { FOLDER_URL: "https://drive.google.com/drive/folders/1BuXKld5F82Z54qBNwMtIOLk_30lRAUSI", API_URL: "https://script.google.com/macros/s/AKfycbxFmDvZb2uYbAN3rCwkQRv0PlvsdYtd0qbya3iskyOEdjoNj7beD5FKQE26oVfoU4i7UA/exec" };
