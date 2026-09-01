@@ -1,8 +1,9 @@
 // --- DOM ELEMENTS ---
 const docSelectContainer = document.getElementById("docSelectContainer");
-const docSelect = document.getElementById("docSelect");
+const docCheckboxes = document.getElementById("docCheckboxes");
 const roleSelect = document.getElementById("roleSelect");
 const promptSearch = document.getElementById("promptSearch");
+const clearSearchBtn = document.getElementById("clearSearchBtn");
 const searchSpinner = document.getElementById("searchSpinner");
 const promptDropdown = document.getElementById("promptDropdown");
 const dynamicInputsContainer = document.getElementById("dynamicInputs");
@@ -15,8 +16,9 @@ const loadingSkeleton = document.getElementById("loadingSkeleton");
 // --- APPLICATION STATE ---
 let allPrompts = [];
 let allFiles = [];
+let selectedDocIds = new Set();
 let selectedPromptText = "";
-let selectedDocId = localStorage.getItem("ce_selected_doc_id") || "all";
+let highlightedIndex = -1;
 const folderCache = {};
 const docTextCache = {};
 
@@ -75,6 +77,7 @@ function extractDocId(url) {
 function showLoading(message = "Loading prompts...") {
   if (loadingSkeleton) loadingSkeleton.style.display = 'flex';
   if (searchSpinner) searchSpinner.style.display = 'block';
+  if (clearSearchBtn) clearSearchBtn.style.display = 'none';
   if (promptSearch) {
     promptSearch.placeholder = message;
     promptSearch.disabled = true;
@@ -87,6 +90,16 @@ function hideLoading() {
   if (promptSearch) {
     promptSearch.placeholder = "Search prompt by title across docs...";
     promptSearch.disabled = false;
+    updateClearSearchBtnVisibility();
+  }
+}
+
+function updateClearSearchBtnVisibility() {
+  if (!clearSearchBtn || !promptSearch) return;
+  if (searchSpinner && searchSpinner.style.display !== 'none') {
+    clearSearchBtn.style.display = 'none';
+  } else {
+    clearSearchBtn.style.display = promptSearch.value.trim() ? 'flex' : 'none';
   }
 }
 
@@ -218,6 +231,70 @@ function parseDocPrompts(text, docInfo = {}) {
   return prompts.map(p => ({ ...p, prompt: p.prompt.trim() }));
 }
 
+// --- DOC SOURCE CHECKBOXES RENDERING ---
+
+function renderDocCheckboxes() {
+  if (!docCheckboxes) return;
+  docCheckboxes.innerHTML = '';
+  
+  if (allFiles.length <= 1) {
+    if (docSelectContainer) docSelectContainer.style.display = 'none';
+    return;
+  }
+  
+  if (docSelectContainer) docSelectContainer.style.display = 'flex';
+
+  // 1. "All Documents" Checkbox Chip
+  const allChip = document.createElement('label');
+  allChip.className = `doc-chip ${selectedDocIds.has('all') ? 'active' : ''}`;
+  allChip.innerHTML = `
+    <input type="checkbox" value="all" ${selectedDocIds.has('all') ? 'checked' : ''}>
+    <span>📁 All (${allFiles.length})</span>
+  `;
+  
+  allChip.querySelector('input').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      allFiles.forEach(f => selectedDocIds.add(f.id));
+      selectedDocIds.add('all');
+    } else {
+      selectedDocIds.clear();
+    }
+    persistAndRefreshDocSelection();
+  });
+  docCheckboxes.appendChild(allChip);
+
+  // 2. Individual Document Checkbox Chips
+  allFiles.forEach(file => {
+    const isChecked = selectedDocIds.has(file.id);
+    const chip = document.createElement('label');
+    chip.className = `doc-chip ${isChecked ? 'active' : ''}`;
+    chip.title = file.name;
+    chip.innerHTML = `
+      <input type="checkbox" value="${escapeHtml(file.id)}" ${isChecked ? 'checked' : ''}>
+      <span>📄 ${escapeHtml(file.name)}</span>
+    `;
+
+    chip.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        selectedDocIds.add(file.id);
+        const allIndividualSelected = allFiles.every(f => selectedDocIds.has(f.id));
+        if (allIndividualSelected) selectedDocIds.add('all');
+      } else {
+        selectedDocIds.delete(file.id);
+        selectedDocIds.delete('all');
+      }
+      persistAndRefreshDocSelection();
+    });
+    docCheckboxes.appendChild(chip);
+  });
+}
+
+function persistAndRefreshDocSelection() {
+  localStorage.setItem("ce_selected_doc_ids", JSON.stringify(Array.from(selectedDocIds)));
+  renderDocCheckboxes();
+  filterAndRenderPrompts(promptSearch.value);
+}
+
 // --- DYNAMIC PLACEHOLDERS PARSING ---
 
 // Parses placeholders with support for default values (e.g. {weeks:4}, {days:15}, {context:This is default context}, {project})
@@ -235,7 +312,6 @@ function parsePlaceholders(text) {
     if (!placeholderMap.has(keyLower)) {
       placeholderMap.set(keyLower, { key, defaultVal });
     } else if (defaultVal && !placeholderMap.get(keyLower).defaultVal) {
-      // If a later placeholder specifies a default value, record it
       placeholderMap.set(keyLower, { key, defaultVal });
     }
   });
@@ -342,11 +418,13 @@ function updateCombinedPrompt() {
 // --- COMBOBOX RENDERING & SEARCH (HEADER-ONLY & MULTI-DOC) ---
 
 function filterAndRenderPrompts(query = "") {
-  const currentDocFilter = (docSelectContainer.style.display !== 'none') ? docSelect.value : 'all';
   let pool = allPrompts;
   
-  if (currentDocFilter && currentDocFilter !== 'all') {
-    pool = allPrompts.filter(p => p.docId === currentDocFilter);
+  // Filter by selected document checkboxes
+  if (allFiles.length > 1 && selectedDocIds.size > 0 && !selectedDocIds.has('all')) {
+    pool = allPrompts.filter(p => selectedDocIds.has(p.docId));
+  } else if (allFiles.length > 1 && selectedDocIds.size === 0) {
+    pool = []; // No docs selected
   }
   
   const cleanQuery = query.toLowerCase().trim();
@@ -356,6 +434,7 @@ function filterAndRenderPrompts(query = "") {
     ? pool.filter(p => p.title.toLowerCase().includes(cleanQuery))
     : pool;
     
+  highlightedIndex = -1;
   renderComboboxOptions(filtered, cleanQuery);
 }
 
@@ -374,12 +453,16 @@ function renderComboboxOptions(promptsToRender, query = "") {
   if (promptsToRender.length === 0) {
     const emptyDiv = document.createElement('div');
     emptyDiv.className = 'combobox-empty';
-    emptyDiv.textContent = query ? `No prompt headers match "${query}"` : 'No prompts available';
+    if (selectedDocIds.size === 0 && allFiles.length > 1) {
+      emptyDiv.textContent = 'Please check at least one Doc Source above';
+    } else {
+      emptyDiv.textContent = query ? `No prompt headers match "${query}"` : 'No prompts available';
+    }
     promptDropdown.appendChild(emptyDiv);
     return;
   }
 
-  const showDocBadge = docSelectContainer.style.display !== 'none' && (docSelect.value === 'all' || !docSelect.value);
+  const showDocBadge = allFiles.length > 1;
 
   for (const item of promptsToRender) {
     const div = document.createElement('div');
@@ -412,6 +495,8 @@ function selectPrompt(title, prompt, docId = null) {
   promptSearch.value = title;
   selectedPromptText = prompt;
   promptDropdown.style.display = 'none';
+  highlightedIndex = -1;
+  updateClearSearchBtnVisibility();
   
   updateDynamicInputs();
   updateCombinedPrompt();
@@ -419,6 +504,17 @@ function selectPrompt(title, prompt, docId = null) {
   // Persist selections
   localStorage.setItem("ce_selected_prompt_title", title);
   localStorage.setItem("ce_selected_prompt_text", prompt);
+}
+
+function updateHighlightedItem(items) {
+  items.forEach((item, idx) => {
+    if (idx === highlightedIndex) {
+      item.classList.add('highlighted');
+      item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      item.classList.remove('highlighted');
+    }
+  });
 }
 
 // --- INITIALIZATION ---
@@ -460,30 +556,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         allFiles = await listFilesInFolder(folderId);
         
         if (allFiles && allFiles.length > 0) {
-          // Setup Doc Source selector
-          docSelectContainer.style.display = 'flex';
-          docSelect.innerHTML = '';
-          
-          const allOpt = document.createElement('option');
-          allOpt.value = 'all';
-          allOpt.textContent = `📁 All Documents (${allFiles.length} files)`;
-          docSelect.appendChild(allOpt);
-          
-          allFiles.forEach(file => {
-            const opt = document.createElement('option');
-            opt.value = file.id;
-            opt.textContent = `📄 ${file.name}`;
-            docSelect.appendChild(opt);
-          });
-          
-          // Restore selected doc if valid
-          if (selectedDocId && (selectedDocId === 'all' || allFiles.some(f => f.id === selectedDocId))) {
-            docSelect.value = selectedDocId;
-          } else {
-            docSelect.value = 'all';
-            selectedDocId = 'all';
-            localStorage.setItem("ce_selected_doc_id", 'all');
+          // Restore saved checkbox preferences or default ALL to selected
+          const savedDocsJson = localStorage.getItem("ce_selected_doc_ids");
+          if (savedDocsJson) {
+            try {
+              const parsed = JSON.parse(savedDocsJson);
+              selectedDocIds = new Set(parsed.filter(id => id === 'all' || allFiles.some(f => f.id === id)));
+            } catch (e) {
+              selectedDocIds = new Set();
+            }
           }
+          
+          if (selectedDocIds.size === 0) {
+            // Default ALL selected
+            selectedDocIds = new Set(allFiles.map(f => f.id));
+            selectedDocIds.add('all');
+          }
+          
+          renderDocCheckboxes();
           
           // Fetch all docs in parallel for instant cross-file search
           const docPromises = allFiles.map(async (file) => {
@@ -539,13 +629,8 @@ roleSelect.addEventListener('change', () => {
   updateCombinedPrompt();
 });
 
-docSelect.addEventListener('change', () => {
-  selectedDocId = docSelect.value;
-  localStorage.setItem("ce_selected_doc_id", selectedDocId);
-  filterAndRenderPrompts(promptSearch.value);
-});
-
 promptSearch.addEventListener('input', () => {
+  updateClearSearchBtnVisibility();
   filterAndRenderPrompts(promptSearch.value);
   promptDropdown.style.display = 'block';
 });
@@ -557,10 +642,74 @@ promptSearch.addEventListener('focus', () => {
   }
 });
 
+// Arrow Keys & Enter Navigation for Combobox
+promptSearch.addEventListener('keydown', (e) => {
+  const items = promptDropdown.querySelectorAll('.combobox-item');
+  if (items.length === 0) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (promptDropdown.style.display === 'none') {
+      promptDropdown.style.display = 'block';
+      highlightedIndex = 0;
+    } else {
+      highlightedIndex = (highlightedIndex + 1) % items.length;
+    }
+    updateHighlightedItem(items);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (promptDropdown.style.display === 'none') {
+      promptDropdown.style.display = 'block';
+      highlightedIndex = items.length - 1;
+    } else {
+      highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
+    }
+    updateHighlightedItem(items);
+  } else if (e.key === 'Enter') {
+    if (promptDropdown.style.display !== 'none' && highlightedIndex >= 0 && highlightedIndex < items.length) {
+      e.preventDefault();
+      items[highlightedIndex].click();
+    }
+  } else if (e.key === 'Escape') {
+    promptDropdown.style.display = 'none';
+    highlightedIndex = -1;
+  }
+});
+
+// Clear Search '✕' Button
+if (clearSearchBtn) {
+  clearSearchBtn.addEventListener('click', () => {
+    promptSearch.value = "";
+    selectedPromptText = "";
+    promptBox.value = "";
+    promptBox.dataset.customText = "";
+    
+    // Clear placeholder values
+    const inputs = dynamicInputsContainer.querySelectorAll("input");
+    inputs.forEach(input => {
+      const key = input.dataset.key || "";
+      if (key) {
+        localStorage.removeItem(`ce_val_${key.toLowerCase()}`);
+      }
+    });
+    
+    localStorage.removeItem("ce_selected_prompt_title");
+    localStorage.removeItem("ce_selected_prompt_text");
+    
+    updateClearSearchBtnVisibility();
+    filterAndRenderPrompts("");
+    updateDynamicInputs();
+    updateCombinedPrompt();
+    promptSearch.focus();
+    promptDropdown.style.display = 'block';
+  });
+}
+
 // Hide dropdown when clicking outside
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.combobox-container')) {
     promptDropdown.style.display = 'none';
+    highlightedIndex = -1;
   }
 });
 
@@ -605,7 +754,7 @@ copyBtn.addEventListener("click", async () => {
   }
 });
 
-// Clear Action
+// Clear All Action
 clearBtn.addEventListener("click", () => {
   promptSearch.value = "";
   selectedPromptText = "";
@@ -624,6 +773,7 @@ clearBtn.addEventListener("click", () => {
   localStorage.removeItem("ce_selected_prompt_title");
   localStorage.removeItem("ce_selected_prompt_text");
   
+  updateClearSearchBtnVisibility();
   filterAndRenderPrompts();
   updateDynamicInputs();
   updateCombinedPrompt();

@@ -29,10 +29,14 @@ During the design phase, the following architectural choices were made to keep t
 4.  **Automatic Dynamic Forms with Default Values**:
     *   Prompts loaded from Google Docs are parsed for placeholders wrapped in curly braces (e.g. `{project}`, `{weeks:4}`, `{days:15}`, `{context:default context}`).
     *   The app dynamically creates text inputs pre-filled with specified defaults, allowing instant customization without manual editing.
-5.  **Multi-Document Indexing & Lightweight Header-Only Search**:
+5.  **Multi-Document Indexing & Filter Chips**:
     *   Fetches all Google Docs in the shared folder in parallel on startup.
-    *   Provides cross-document search matching strictly against prompt headers/titles (`### Header`), ensuring light, instant search performance across large collections.
-6.  **Visual Loading States & Skeleton Placeholders**:
+    *   Replaces single dropdowns with multi-select document filter chips/checkboxes (all active by default), enabling cross-document search across all docs simultaneously.
+6.  **Lightweight Header-Only Search & Keyboard Navigation**:
+    *   Provides search matching strictly against prompt headers/titles (`### Header`), ensuring light, instant search performance.
+    *   Full keyboard navigation with `ArrowUp` / `ArrowDown` scrolling, `Enter` to select, and `Escape` to dismiss.
+    *   Includes a quick clear `✕` button directly inside the search input.
+7.  **Visual Loading States & Skeleton Placeholders**:
     *   Displays animated skeleton pulse loaders and an input spinner during startup, document fetching, and prompt indexing.
 
 ---

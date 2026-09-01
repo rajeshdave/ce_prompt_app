@@ -28,10 +28,10 @@
         <div class="skeleton-line" style="width: 50%;"></div>
       </div>
 
-      <!-- Doc Source Selection (visible when folder URL is present) -->
+      <!-- Doc Sources Filter Checkboxes (visible when folder URL is present) -->
       <div id="docSelectContainer" class="form-group" style="display: none;">
-        <label for="docSelect">Doc Source:</label>
-        <select id="docSelect" class="form-input"></select>
+        <label>Doc Sources (Search in):</label>
+        <div id="docCheckboxes" class="doc-checkbox-group"></div>
       </div>
 
       <!-- Prompt Selection Combobox -->
@@ -39,6 +39,7 @@
         <label for="promptSearch">Search or Select Prompt:</label>
         <div class="combobox-container">
           <input type="text" id="promptSearch" class="form-input combobox-input" placeholder="Search prompt by title across docs..." autocomplete="off">
+          <button type="button" id="clearSearchBtn" class="clear-search-btn" style="display: none;" title="Clear search" aria-label="Clear search">✕</button>
           <div id="searchSpinner" class="input-spinner" style="display: none;" title="Loading prompts..."></div>
           <div id="promptDropdown" class="combobox-dropdown"></div>
         </div>
