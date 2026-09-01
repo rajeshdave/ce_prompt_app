@@ -142,10 +142,89 @@ select.form-input {
   100% { transform: translateY(-50%) rotate(360deg); }
 }
 
+/* --- DOC FILTER CHECKBOXES / CHIPS --- */
+.doc-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: #F7FAFC;
+  color: #4A5568;
+  border: 1.5px solid #E2E8F0;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+}
+
+.doc-chip input[type="checkbox"] {
+  accent-color: #3182CE;
+  margin: 0;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+
+.doc-chip.active {
+  background-color: #EBF8FF;
+  border-color: #3182CE;
+  color: #2B6CB0;
+  font-weight: 600;
+}
+
+.doc-chip:hover {
+  border-color: #CBD5E0;
+}
+
+.doc-chip.active:hover {
+  border-color: #2B6CB0;
+}
+
 /* --- COMBOBOX STYLES --- */
 .combobox-container {
   position: relative;
   width: 100%;
+}
+
+.combobox-input {
+  padding-right: 40px;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #E2E8F0;
+  color: #718096;
+  border: none;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: background-color 0.15s, color 0.15s;
+  z-index: 10;
+}
+
+.clear-search-btn:hover {
+  background: #CBD5E0;
+  color: #2D3748;
 }
 
 .combobox-dropdown {
@@ -181,12 +260,14 @@ select.form-input {
   border-bottom: none;
 }
 
-.combobox-item:hover {
-  background-color: #F7FAFC;
+.combobox-item:hover,
+.combobox-item.highlighted {
+  background-color: #EBF8FF;
+  color: #2B6CB0;
 }
 
 .combobox-item.selected {
-  background-color: #EBF8FF;
+  background-color: #BEE3F8;
   color: #2B6CB0;
   font-weight: 600;
 }

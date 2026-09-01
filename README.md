@@ -9,13 +9,15 @@ Designed for quick mobile and desktop access, it operates entirely in the browse
 ## 🚀 Key Features
 
 * **Cross-Doc Header Search**: Lightning-fast, lightweight search across all Google Docs in your folder by prompt title/header.
-* **Doc Selection Dropdown**: Switch between "All Documents" or individual Google Docs on the fly.
+* **Doc Source Filter Chips / Checkboxes**: Multi-select document filter pills with all docs selected by default for seamless cross-doc querying.
+* **Keyboard Navigation**: Navigate dropdown results with `ArrowUp` / `ArrowDown`, press `Enter` to select, and `Escape` to close.
+* **Quick Clear Search (`✕`)**: 1-click button inside the search box to clear filters and reset selection.
 * **Loading Spinner & Skeletons**: Visual loading indicators and skeleton placeholders during startup and file indexing.
 * **Dynamic Placeholders with Defaults**: Automatically parses parameters like `{weeks:4}`, `{days:15}`, `{context:default context}`, or `{project}` with pre-filled defaults and real-time editing.
 * **Role/Persona Selection**: Prepend agent instructions dynamically from `Roles.txt`.
 * **One-Click Copy**: Renders a large button to compile and copy the final formatted prompt directly to your clipboard.
 * **No Maintenance**: Purely static layout with no third-party libraries or API configurations to maintain.
-* **Local Caching**: Remembers your selected role, document, active prompt, and inputs using browser `localStorage` in case of accidental refreshes or app switches on mobile.
+* **Local Caching**: Remembers your selected role, document filters, active prompt, and inputs using browser `localStorage`.
 
 ---
 
