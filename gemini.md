@@ -26,9 +26,14 @@ During the design phase, the following architectural choices were made to keep t
     *   Instead, it compiles the prompt and copies it to the browser's clipboard, providing a clean copy-and-paste interface.
 3.  **Local Storage Caching (Mobile Resilience)**:
     *   Browsers on mobile platforms are frequently suspended when switching tasks. To ensure the user's active prompt session is not lost, the app auto-saves the active document selection, selected persona/role, search text, and dynamic placeholder values to the browser's `localStorage` on every keystroke.
-4.  **Automatic Dynamic Forms**:
-    *   Prompts loaded from Google Docs are parsed for placeholders wrapped in curly braces (e.g. `{project}`, `{weeks}`).
-    *   The app dynamically creates text inputs in the UI for each placeholder, allowing quick custom replacements without editing the prompt template manually.
+4.  **Automatic Dynamic Forms with Default Values**:
+    *   Prompts loaded from Google Docs are parsed for placeholders wrapped in curly braces (e.g. `{project}`, `{weeks:4}`, `{days:15}`, `{context:default context}`).
+    *   The app dynamically creates text inputs pre-filled with specified defaults, allowing instant customization without manual editing.
+5.  **Multi-Document Indexing & Lightweight Header-Only Search**:
+    *   Fetches all Google Docs in the shared folder in parallel on startup.
+    *   Provides cross-document search matching strictly against prompt headers/titles (`### Header`), ensuring light, instant search performance across large collections.
+6.  **Visual Loading States & Skeleton Placeholders**:
+    *   Displays animated skeleton pulse loaders and an input spinner during startup, document fetching, and prompt indexing.
 
 ---
 
