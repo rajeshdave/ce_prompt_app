@@ -27,7 +27,7 @@ During the design phase, the following architectural choices were made to keep t
 3.  **Local Storage Caching (Mobile Resilience)**:
     *   Browsers on mobile platforms are frequently suspended when switching tasks. To ensure the user's active prompt session is not lost, the app auto-saves the active document selection, selected persona/role, search text, and dynamic placeholder values to the browser's `localStorage` on every keystroke.
 4.  **Automatic Dynamic Forms with Default Values**:
-    *   Prompts loaded from Google Docs are parsed for placeholders wrapped in curly braces (e.g. `{project}`, `{weeks:4}`, `{days:15}`, `{context:default context}`).
+    *   Prompts loaded from Google Docs are parsed for placeholders wrapped in double curly braces (e.g. `{{project}}`, `{{weeks:4}}`, `{{days:15}}`, `{{context:default context}}`).
     *   The app dynamically creates text inputs pre-filled with specified defaults, allowing instant customization without manual editing.
 5.  **Multi-Document Indexing & Filter Chips**:
     *   Fetches all Google Docs in the shared folder in parallel on startup.
