@@ -297,17 +297,18 @@ function persistAndRefreshDocSelection() {
 
 // --- DYNAMIC PLACEHOLDERS PARSING ---
 
-// Parses placeholders with support for default values (e.g. {weeks:4}, {days:15}, {context:This is default context}, {project})
+// Parses placeholders with support for default values (e.g. {{weeks:4}}, {{days:15}}, {{context:This is default context}}, {{project}})
 function parsePlaceholders(text) {
-  const rawMatches = text.match(/{[^{}]+}/g) || [];
+  const rawMatches = text.match(/{{[^{}]+}}/g) || [];
   const placeholderMap = new Map();
   
   rawMatches.forEach(match => {
-    const inner = match.slice(1, -1);
+    const inner = match.slice(2, -2);
     const colonIdx = inner.indexOf(':');
     const key = (colonIdx !== -1 ? inner.substring(0, colonIdx) : inner).trim();
     const defaultVal = colonIdx !== -1 ? inner.substring(colonIdx + 1).trim() : "";
     
+    if (!key) return;
     const keyLower = key.toLowerCase();
     if (!placeholderMap.has(keyLower)) {
       placeholderMap.set(keyLower, { key, defaultVal });
@@ -391,12 +392,12 @@ function getBaseCombinedWithoutManual() {
       const v = parseInt(value || defaultVal || "1", 10) || 1;
       value = v === 1 ? '1 week' : `${v} weeks`;
     } else if (value === "") {
-      value = defaultVal ? defaultVal : `{${key}}`;
+      value = defaultVal ? defaultVal : `{{${key}}}`;
     }
 
     if (key) {
-      const regex = new RegExp('\\{' + escapeRegex(key) + '(?::[^{}]*)?\\}', 'gi');
-      combined = combined.replace(regex, value);
+      const regex = new RegExp('\\{\\{\\s*' + escapeRegex(key) + '(?:\\s*:[^{}]*)?\\s*\\}\\}', 'gi');
+      combined = combined.replace(regex, () => value);
     }
   });
   
