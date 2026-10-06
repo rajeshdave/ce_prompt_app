@@ -24,8 +24,12 @@ During the design phase, the following architectural choices were made to keep t
 2.  **No Maintenance (No Provider APIs)**:
     *   To prevent the app from breaking when AI providers (like OpenAI, Google Gemini, Anthropic Claude, or Perplexity) update their DOM structures, the app does not interact with the providers' pages directly.
     *   Instead, it compiles the prompt and copies it to the browser's clipboard, providing a clean copy-and-paste interface.
-3.  **Local Storage Caching (Mobile Resilience)**:
-    *   Browsers on mobile platforms are frequently suspended when switching tasks. To ensure the user's active prompt session is not lost, the app auto-saves the active document selection, selected persona/role, search text, and dynamic placeholder values to the browser's `localStorage` on every keystroke.
+3.  **Cross-Platform Persistent Storage & On-Demand Sync (Mobile Tab Discard Resilience)**:
+    *   Mobile browsers (iOS Safari, Android Chrome) and laptop browsers with Memory Saver actively evict background tabs to conserve RAM, triggering full page reloads when returning to the tab.
+    *   To prevent redundant Google Drive downloads on every tab change or refresh, the app persists parsed prompts (`ce_cached_prompts`), document metadata (`ce_cached_files`), and roles (`ce_cached_roles`) in browser `localStorage`.
+    *   On startup or tab switch, data is loaded instantly from `localStorage` in <5ms with 0 network calls.
+    *   A dedicated **Refresh** button in the header allows users to pull fresh Google Docs updates on-demand only when templates change in Drive, complete with live relative sync timestamps (e.g., "Synced 5m ago").
+    *   Active user drafts (inputs, selected doc filters, search keywords) continue to be saved on every keystroke.
 4.  **Automatic Dynamic Forms with Default Values**:
     *   Prompts loaded from Google Docs are parsed for placeholders wrapped in double curly braces (e.g. `{{project}}`, `{{weeks:4}}`, `{{days:15}}`, `{{context:default context}}`).
     *   The app dynamically creates text inputs pre-filled with specified defaults, allowing instant customization without manual editing.

@@ -17,7 +17,8 @@ Designed for quick mobile and desktop access, it operates entirely in the browse
 * **Role/Persona Selection**: Prepend agent instructions dynamically from `Roles.txt`.
 * **One-Click Copy**: Renders a large button to compile and copy the final formatted prompt directly to your clipboard.
 * **No Maintenance**: Purely static layout with no third-party libraries or API configurations to maintain.
-* **Local Caching**: Remembers your selected role, document filters, active prompt, and inputs using browser `localStorage`.
+* **Instant Persistent Caching**: Caches documents and parsed prompts directly in `localStorage` across iOS, Android, and laptops/desktops, preventing unwanted downloads from Google Drive on tab switches or page reloads.
+* **On-Demand Drive Sync Button**: Dedicated header "Refresh" button with live sync status timestamps, allowing you to update prompts from Google Drive only when you edit templates.
 
 ---
 

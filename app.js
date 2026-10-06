@@ -12,6 +12,9 @@ const copyBtn = document.getElementById("copyBtn");
 const copyBtnText = document.getElementById("copyBtnText");
 const clearBtn = document.getElementById("clearBtn");
 const loadingSkeleton = document.getElementById("loadingSkeleton");
+const refreshBtn = document.getElementById("refreshBtn");
+const refreshBtnText = document.getElementById("refreshBtnText");
+const syncStatus = document.getElementById("syncStatus");
 
 // --- APPLICATION STATE ---
 let allPrompts = [];
@@ -19,8 +22,64 @@ let allFiles = [];
 let selectedDocIds = new Set();
 let selectedPromptText = "";
 let highlightedIndex = -1;
+let isRefreshing = false;
 const folderCache = {};
 const docTextCache = {};
+
+// --- LOCAL STORAGE HELPERS (CROSS-PLATFORM SAFE) ---
+function safeStorageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (err) {
+    console.warn(`[Storage] Failed to read ${key}:`, err);
+    return null;
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    console.warn(`[Storage] Failed to write ${key}:`, err);
+    return false;
+  }
+}
+
+function safeStorageRemove(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {
+    console.warn(`[Storage] Failed to remove ${key}:`, err);
+  }
+}
+
+// Format relative sync time for status display
+function formatSyncTime(timestamp) {
+  if (!timestamp) return "";
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return "Synced just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `Synced ${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `Synced ${diffHr}h ago`;
+  const d = new Date(timestamp);
+  return `Synced on ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+}
+
+// Update the sync status text in header
+function updateSyncStatusDisplay(timestamp = null) {
+  if (!syncStatus) return;
+  const ts = timestamp || Number(safeStorageGet("ce_cache_timestamp")) || null;
+  if (!ts) {
+    syncStatus.textContent = "";
+    syncStatus.title = "";
+    return;
+  }
+  syncStatus.textContent = formatSyncTime(ts);
+  const fullDate = new Date(ts).toLocaleString();
+  syncStatus.title = `Last synced with Google Drive: ${fullDate}`;
+}
 
 // --- UTILITY FUNCTIONS ---
 
@@ -290,7 +349,7 @@ function renderDocCheckboxes() {
 }
 
 function persistAndRefreshDocSelection() {
-  localStorage.setItem("ce_selected_doc_ids", JSON.stringify(Array.from(selectedDocIds)));
+  safeStorageSet("ce_selected_doc_ids", JSON.stringify(Array.from(selectedDocIds)));
   renderDocCheckboxes();
   filterAndRenderPrompts(promptSearch.value);
 }
@@ -347,7 +406,7 @@ function updateDynamicInputs() {
     input.dataset.defaultVal = defaultVal;
     
     // Check cached value vs default value
-    const cachedVal = localStorage.getItem(`ce_val_${keyLower}`);
+    const cachedVal = safeStorageGet(`ce_val_${keyLower}`);
     if (cachedVal !== null) {
       input.value = cachedVal;
     } else if (defaultVal !== "") {
@@ -363,7 +422,7 @@ function updateDynamicInputs() {
     }
 
     input.addEventListener('input', () => {
-      localStorage.setItem(`ce_val_${keyLower}`, input.value);
+      safeStorageSet(`ce_val_${keyLower}`, input.value);
       updateCombinedPrompt();
     });
 
@@ -503,8 +562,8 @@ function selectPrompt(title, prompt, docId = null) {
   updateCombinedPrompt();
   
   // Persist selections
-  localStorage.setItem("ce_selected_prompt_title", title);
-  localStorage.setItem("ce_selected_prompt_text", prompt);
+  safeStorageSet("ce_selected_prompt_title", title);
+  safeStorageSet("ce_selected_prompt_text", prompt);
 }
 
 function updateHighlightedItem(items) {
@@ -518,47 +577,84 @@ function updateHighlightedItem(items) {
   });
 }
 
-// --- INITIALIZATION ---
+// --- ROLES LOADING & CACHING ---
 
-document.addEventListener('DOMContentLoaded', async () => {
-  showLoading("Loading prompts from Google Drive...");
+function populateRoles(roles) {
+  if (!roleSelect) return;
+  roleSelect.innerHTML = '<option value="">-- None --</option>';
+  roles.forEach(role => {
+    const opt = document.createElement('option');
+    opt.value = role;
+    opt.textContent = role;
+    roleSelect.appendChild(opt);
+  });
+  
+  // Restore cached role selection
+  const cachedRole = safeStorageGet("ce_selected_role");
+  if (cachedRole && roles.includes(cachedRole)) {
+    roleSelect.value = cachedRole;
+  }
+}
 
-  // 1. Load roles from Roles.txt
+async function loadRoles(forceRefresh = false) {
+  if (!forceRefresh) {
+    const cachedRolesJson = safeStorageGet("ce_cached_roles");
+    if (cachedRolesJson) {
+      try {
+        const roles = JSON.parse(cachedRolesJson);
+        if (Array.isArray(roles) && roles.length > 0) {
+          populateRoles(roles);
+          return;
+        }
+      } catch (e) {
+        console.warn("Error parsing cached roles:", e);
+      }
+    }
+  }
+
   try {
     const res = await fetch('Roles.txt');
     if (res.ok) {
       const text = await res.text();
       const roles = text.split('\n').map(l => l.trim()).filter(l => l);
-      roles.forEach(role => {
-        const opt = document.createElement('option');
-        opt.value = role;
-        opt.textContent = role;
-        roleSelect.appendChild(opt);
-      });
-      
-      // Restore cached role selection
-      const cachedRole = localStorage.getItem("ce_selected_role");
-      if (cachedRole && roles.includes(cachedRole)) {
-        roleSelect.value = cachedRole;
-      }
+      safeStorageSet("ce_cached_roles", JSON.stringify(roles));
+      populateRoles(roles);
     }
   } catch (err) {
     console.error("Error loading Roles.txt", err);
   }
+}
 
-  // 2. Load prompts from Google Drive Folder URL (or single doc URL)
+// --- PROMPTS LOADING & CACHING ---
+
+async function loadPrompts(forceRefresh = false) {
   const folderUrl = window.ENV ? window.ENV.FOLDER_URL : null;
-  if (folderUrl) {
-    try {
-      const folderId = extractFolderId(folderUrl);
-      
-      if (folderId && (folderUrl.includes('drive.google.com/drive/folders/') || folderUrl.includes('drive.google.com/drive/u/') || folderUrl.includes('embeddedfolderview'))) {
-        // Multi-doc folder
-        allFiles = await listFilesInFolder(folderId);
-        
-        if (allFiles && allFiles.length > 0) {
+  if (!folderUrl) {
+    hideLoading();
+    console.error("No Google Drive folder URL found in window.ENV. Make sure env.js is properly created or loaded.");
+    return false;
+  }
+
+  const folderId = extractFolderId(folderUrl);
+
+  // 1. Try restoring from local cache (instant offline load across iOS/Android/Laptops)
+  if (!forceRefresh) {
+    const cachedPromptsJson = safeStorageGet("ce_cached_prompts");
+    const cachedFilesJson = safeStorageGet("ce_cached_files");
+    const cachedFolderId = safeStorageGet("ce_cache_folder_id");
+    const cachedTimestamp = safeStorageGet("ce_cache_timestamp");
+
+    if (cachedPromptsJson && cachedFilesJson && cachedFolderId === folderId) {
+      try {
+        const parsedPrompts = JSON.parse(cachedPromptsJson);
+        const parsedFiles = JSON.parse(cachedFilesJson);
+
+        if (Array.isArray(parsedPrompts) && parsedPrompts.length > 0) {
+          allFiles = parsedFiles;
+          allPrompts = parsedPrompts;
+
           // Restore saved checkbox preferences or default ALL to selected
-          const savedDocsJson = localStorage.getItem("ce_selected_doc_ids");
+          const savedDocsJson = safeStorageGet("ce_selected_doc_ids");
           if (savedDocsJson) {
             try {
               const parsed = JSON.parse(savedDocsJson);
@@ -567,66 +663,184 @@ document.addEventListener('DOMContentLoaded', async () => {
               selectedDocIds = new Set();
             }
           }
-          
           if (selectedDocIds.size === 0) {
-            // Default ALL selected
             selectedDocIds = new Set(allFiles.map(f => f.id));
             selectedDocIds.add('all');
           }
-          
+
           renderDocCheckboxes();
-          
-          // Fetch all docs in parallel for instant cross-file search
-          const docPromises = allFiles.map(async (file) => {
-            const docText = await fetchDocText(file.id);
-            return parseDocPrompts(docText, file);
-          });
-          
-          const parsedResults = await Promise.all(docPromises);
-          allPrompts = parsedResults.flat();
-        } else {
-          console.warn(`No Google Doc files found in the folder: ${folderUrl}`);
+          filterAndRenderPrompts(promptSearch ? promptSearch.value : "");
+
+          // Restore cached prompt selection if available
+          const cachedTitle = safeStorageGet("ce_selected_prompt_title");
+          const cachedText = safeStorageGet("ce_selected_prompt_text");
+          if (cachedTitle && cachedText && allPrompts.some(p => p.title === cachedTitle)) {
+            const found = allPrompts.find(p => p.title === cachedTitle);
+            selectPrompt(found.title, found.prompt, found.docId);
+          }
+
+          updateSyncStatusDisplay(Number(cachedTimestamp));
+          return true;
         }
+      } catch (err) {
+        console.warn("Failed to parse cached prompts, falling back to network fetch:", err);
+      }
+    }
+  }
+
+  // 2. Fetch fresh prompts from Google Drive (first load or explicit refresh)
+  if (!forceRefresh) {
+    showLoading("Loading prompts from Google Drive...");
+  } else {
+    // Clear in-memory caches to guarantee fresh response
+    for (const k in folderCache) delete folderCache[k];
+    for (const k in docTextCache) delete docTextCache[k];
+  }
+
+  try {
+    let freshFiles = [];
+    let freshPrompts = [];
+
+    if (folderId && (folderUrl.includes('drive.google.com/drive/folders/') || folderUrl.includes('drive.google.com/drive/u/') || folderUrl.includes('embeddedfolderview'))) {
+      freshFiles = await listFilesInFolder(folderId);
+
+      if (freshFiles && freshFiles.length > 0) {
+        // Fetch all docs in parallel for instant cross-file search
+        const docPromises = freshFiles.map(async (file) => {
+          const docText = await fetchDocText(file.id);
+          return parseDocPrompts(docText, file);
+        });
+
+        const parsedResults = await Promise.all(docPromises);
+        freshPrompts = parsedResults.flat();
       } else {
-        // Single Document URL fallback
-        const docId = extractDocId(folderUrl);
-        let singleText = "";
-        if (docId) {
-          singleText = await fetchDocText(docId);
-        } else {
-          const fetchUrl = getDownloadUrl(folderUrl);
-          const res = await fetch(fetchUrl);
-          if (res.ok) singleText = await res.text();
-        }
-        if (singleText) {
-          allPrompts = parseDocPrompts(singleText, { id: docId || "single", name: "Main Document" });
+        console.warn(`No Google Doc files found in the folder: ${folderUrl}`);
+      }
+    } else {
+      // Single Document URL fallback
+      const docId = extractDocId(folderUrl);
+      let singleText = "";
+      if (docId) {
+        singleText = await fetchDocText(docId);
+      } else {
+        const fetchUrl = getDownloadUrl(folderUrl);
+        const res = await fetch(fetchUrl);
+        if (res.ok) singleText = await res.text();
+      }
+      if (singleText) {
+        freshFiles = [{ id: docId || "single", name: "Main Document" }];
+        freshPrompts = parseDocPrompts(singleText, freshFiles[0]);
+      }
+    }
+
+    if (freshPrompts && freshPrompts.length > 0) {
+      allFiles = freshFiles;
+      allPrompts = freshPrompts;
+
+      // Save to persistent storage for iOS/Android/Laptop caching
+      const now = Date.now();
+      safeStorageSet("ce_cached_files", JSON.stringify(allFiles));
+      safeStorageSet("ce_cached_prompts", JSON.stringify(allPrompts));
+      safeStorageSet("ce_cache_folder_id", folderId);
+      safeStorageSet("ce_cache_timestamp", now.toString());
+
+      // Restore saved checkbox preferences or default ALL to selected
+      const savedDocsJson = safeStorageGet("ce_selected_doc_ids");
+      if (savedDocsJson) {
+        try {
+          const parsed = JSON.parse(savedDocsJson);
+          selectedDocIds = new Set(parsed.filter(id => id === 'all' || allFiles.some(f => f.id === id)));
+        } catch (e) {
+          selectedDocIds = new Set();
         }
       }
-      
-      filterAndRenderPrompts();
-      
+      if (selectedDocIds.size === 0) {
+        selectedDocIds = new Set(allFiles.map(f => f.id));
+        selectedDocIds.add('all');
+      }
+
+      renderDocCheckboxes();
+      filterAndRenderPrompts(promptSearch ? promptSearch.value : "");
+
       // Restore cached prompt selection if available
-      const cachedTitle = localStorage.getItem("ce_selected_prompt_title");
-      const cachedText = localStorage.getItem("ce_selected_prompt_text");
+      const cachedTitle = safeStorageGet("ce_selected_prompt_title");
+      const cachedText = safeStorageGet("ce_selected_prompt_text");
       if (cachedTitle && cachedText && allPrompts.some(p => p.title === cachedTitle)) {
         const found = allPrompts.find(p => p.title === cachedTitle);
         selectPrompt(found.title, found.prompt, found.docId);
       }
-    } catch (err) {
-      console.error("Error fetching prompts from Google Drive:", err);
-    } finally {
-      hideLoading();
+
+      updateSyncStatusDisplay(now);
+      return true;
+    } else {
+      console.warn("No prompts parsed from Google Drive.");
+      return false;
     }
-  } else {
+  } catch (err) {
+    console.error("Error fetching prompts from Google Drive:", err);
+    return false;
+  } finally {
     hideLoading();
-    console.error("No Google Drive folder URL found in window.ENV. Make sure env.js is properly created or loaded.");
+  }
+}
+
+// --- INITIALIZATION ---
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadRoles(false);
+  await loadPrompts(false);
+});
+
+// Update the relative sync timestamp when switching back to tab
+window.addEventListener('focus', () => {
+  updateSyncStatusDisplay();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    updateSyncStatusDisplay();
   }
 });
 
 // --- UI EVENT LISTENERS ---
 
+// Manual Refresh Button Action
+if (refreshBtn) {
+  refreshBtn.addEventListener('click', async () => {
+    if (isRefreshing) return;
+    isRefreshing = true;
+
+    refreshBtn.classList.add('loading');
+    if (refreshBtnText) refreshBtnText.textContent = "Syncing...";
+
+    try {
+      await loadRoles(true);
+      const success = await loadPrompts(true);
+
+      refreshBtn.classList.remove('loading');
+      if (success) {
+        refreshBtn.classList.add('success');
+        if (refreshBtnText) refreshBtnText.textContent = "Synced! ✓";
+        setTimeout(() => {
+          refreshBtn.classList.remove('success');
+          if (refreshBtnText) refreshBtnText.textContent = "Refresh";
+        }, 1500);
+      } else {
+        if (refreshBtnText) refreshBtnText.textContent = "Refresh";
+        alert("Unable to reach Google Drive. Using existing cached prompts.");
+      }
+    } catch (err) {
+      console.error("Error refreshing prompts:", err);
+      refreshBtn.classList.remove('loading');
+      if (refreshBtnText) refreshBtnText.textContent = "Refresh";
+      alert("Error refreshing prompts from Google Drive. Your cached prompts were kept.");
+    } finally {
+      isRefreshing = false;
+    }
+  });
+}
+
 roleSelect.addEventListener('change', () => {
-  localStorage.setItem("ce_selected_role", roleSelect.value);
+  safeStorageSet("ce_selected_role", roleSelect.value);
   updateCombinedPrompt();
 });
 
@@ -690,12 +904,12 @@ if (clearSearchBtn) {
     inputs.forEach(input => {
       const key = input.dataset.key || "";
       if (key) {
-        localStorage.removeItem(`ce_val_${key.toLowerCase()}`);
+        safeStorageRemove(`ce_val_${key.toLowerCase()}`);
       }
     });
     
-    localStorage.removeItem("ce_selected_prompt_title");
-    localStorage.removeItem("ce_selected_prompt_text");
+    safeStorageRemove("ce_selected_prompt_title");
+    safeStorageRemove("ce_selected_prompt_text");
     
     updateClearSearchBtnVisibility();
     filterAndRenderPrompts("");
@@ -767,12 +981,12 @@ clearBtn.addEventListener("click", () => {
   inputs.forEach(input => {
     const key = input.dataset.key || "";
     if (key) {
-      localStorage.removeItem(`ce_val_${key.toLowerCase()}`);
+      safeStorageRemove(`ce_val_${key.toLowerCase()}`);
     }
   });
   
-  localStorage.removeItem("ce_selected_prompt_title");
-  localStorage.removeItem("ce_selected_prompt_text");
+  safeStorageRemove("ce_selected_prompt_title");
+  safeStorageRemove("ce_selected_prompt_text");
   
   updateClearSearchBtnVisibility();
   filterAndRenderPrompts();
