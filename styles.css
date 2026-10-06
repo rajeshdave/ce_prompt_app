@@ -27,10 +27,22 @@ body {
 .app-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid #EDF2F7;
   gap: 12px;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
 }
 
 .app-header h1 {
@@ -39,10 +51,72 @@ body {
   margin: 0;
   color: #1A202C;
   font-weight: 600;
+  line-height: 1.2;
+}
+
+.sync-status {
+  font-size: 11px;
+  color: #718096;
+  font-weight: 500;
+  margin-top: 2px;
 }
 
 .logo-emoji {
   font-size: 28px;
+  line-height: 1;
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4A5568;
+  background-color: #F7FAFC;
+  border: 1.5px solid #CBD5E0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  flex-shrink: 0;
+  outline: none;
+  font-family: inherit;
+  min-height: 36px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.refresh-btn:hover {
+  background-color: #EDF2F7;
+  border-color: #A0AEC0;
+  color: #2D3748;
+}
+
+.refresh-btn:active {
+  transform: translateY(1px);
+}
+
+.refresh-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.refresh-btn.loading {
+  pointer-events: none;
+  background-color: #EBF8FF;
+  border-color: #90CDF4;
+  color: #2B6CB0;
+}
+
+.refresh-btn.loading .refresh-icon {
+  animation: spin 0.8s linear infinite;
+}
+
+.refresh-btn.success {
+  background-color: #F0FFF4;
+  border-color: #9AE6B4;
+  color: #276749;
 }
 
 /* --- FORM STYLING --- */
@@ -453,12 +527,29 @@ textarea:focus {
     border-radius: 12px;
   }
 
+  .app-header {
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    gap: 8px;
+  }
+
   .app-header h1 {
-    font-size: 20px;
+    font-size: 19px;
   }
 
   .logo-emoji {
     font-size: 24px;
+  }
+
+  .sync-status {
+    font-size: 10px;
+  }
+
+  .refresh-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 32px;
+    gap: 4px;
   }
 
   .dynamic-input-row {
