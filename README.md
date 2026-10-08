@@ -42,18 +42,36 @@ Standard web browsers restrict cross-origin requests (CORS). When your static ap
 
 To resolve this completely and securely, you can deploy a **free, personal Google Apps Script Web App** under your Google Account to act as a CORS-compliant proxy API.
 
-### Step 1: Create & Deploy the Apps Script
+### Step 1: Create & Deploy the Secure Apps Script
 1. Go to [script.google.com](https://script.google.com) and click **New project**.
 2. Replace all the code in `Code.gs` with the following:
    ```javascript
+   // ====================================================
+   // CE PROMPT APP - SECURE GOOGLE APPS SCRIPT API
+   // ====================================================
+
+   // 1. Paste your private/restricted Google Drive Folder ID:
+   const PROMPT_FOLDER_ID = "YOUR_RESTRICTED_FOLDER_ID_HERE";
+
+   // 2. Choose your own Secret Access Passcode:
+   const ACCESS_KEY = "CHOOSE_YOUR_SECRET_PASSCODE_HERE";
+
    function doGet(e) {
-     var action = e.parameter.action;
-     
+     var params = e.parameter || {};
+     var userKey = params.key;
+
+     // Verify access passcode
+     var validKey = PropertiesService.getScriptProperties().getProperty("ACCESS_KEY") || ACCESS_KEY;
+     if (!userKey || userKey !== validKey) {
+       return createJsonResponse({ error: "Unauthorized: Invalid or missing access key" });
+     }
+
+     var action = params.action;
+
+     // Action 1: List all Google Docs inside the private folder
      if (action === "list") {
-       var folderId = e.parameter.folderId;
-       if (!folderId) return createJsonResponse({ error: "Missing folderId" });
        try {
-         var folder = DriveApp.getFolderById(folderId);
+         var folder = DriveApp.getFolderById(PROMPT_FOLDER_ID);
          var files = folder.getFiles();
          var result = [];
          while (files.hasNext()) {
@@ -62,24 +80,41 @@ To resolve this completely and securely, you can deploy a **free, personal Googl
              result.push({ id: file.getId(), name: file.getName() });
            }
          }
-         result.sort((a, b) => a.name.localeCompare(b.name));
+         result.sort(function(a, b) { return a.name.localeCompare(b.name); });
          return createJsonResponse(result);
        } catch (err) {
          return createJsonResponse({ error: err.toString() });
        }
      }
-     
+
+     // Action 2: Fetch raw text of a specific Google Doc
      if (action === "get") {
-       var docId = e.parameter.docId;
+       var docId = params.docId;
        if (!docId) return createJsonResponse({ error: "Missing docId" });
+
        try {
+         // Security guard: verify the requested doc belongs to your prompt folder
+         var file = DriveApp.getFileById(docId);
+         var parents = file.getParents();
+         var isAllowed = false;
+         while (parents.hasNext()) {
+           if (parents.next().getId() === PROMPT_FOLDER_ID) {
+             isAllowed = true;
+             break;
+           }
+         }
+
+         if (!isAllowed) {
+           return createJsonResponse({ error: "Access denied: Document is not in prompt folder" });
+         }
+
          var doc = DocumentApp.openById(docId);
          return createTextResponse(doc.getBody().getText());
        } catch (err) {
          return createJsonResponse({ error: err.toString() });
        }
      }
-     
+
      return createJsonResponse({ error: "Invalid action" });
    }
 
@@ -99,7 +134,7 @@ To resolve this completely and securely, you can deploy a **free, personal Googl
 6. Fill in the deployment details:
    * **Description**: `CE Prompt App API`
    * **Execute as**: **Me (your-email@gmail.com)**
-   * **Who has access**: **Anyone** *(This is essential to allow CORS fetches from your GitHub Pages URL)*
+   * **Who has access**: **Anyone** *(Required to allow CORS fetches from your GitHub Pages URL)*
 7. Click **Deploy**. Authorize permissions when prompted.
 8. Copy the **Web App URL** generated (it will look like `https://script.google.com/macros/s/AKfycb.../exec`).
 
@@ -109,11 +144,14 @@ To resolve this completely and securely, you can deploy a **free, personal Googl
 3. Create two **Repository Secrets**:
    * **Secret 1**:
      * **Name**: `PROMPT_FOLDER_URL`
-     * **Value**: `https://drive.google.com/drive/folders/1BuXKld5F82Z54qBNwMtIOLk_30lRAUSI?usp=sharing` (Your folder link)
+     * **Value**: `https://drive.google.com/drive/folders/YOUR_RESTRICTED_FOLDER_ID` (Your folder link)
    * **Secret 2**:
      * **Name**: `SCRIPT_API_URL`
      * **Value**: `https://script.google.com/macros/s/.../exec` (The Web App URL you copied in Step 1)
 4. Push any change to your `main` or `master` branch to trigger a deploy. The action will build `env.js` using both secrets and deploy to `gh-pages`.
 5. Under **Settings** -> **Pages**, make sure **Build and deployment** is set to pull from the **`gh-pages`** branch (root folder).
+
+### Step 3: Enter Passcode in App
+When opening your deployed app for the first time, click the **Key (🔑)** button in the header (or enter it when prompted). Enter your secret passcode. It will be saved securely in your browser's `localStorage` and automatically sent with future sync requests!
 
 Your app will be live and loading prompts correctly at `https://<your-username>.github.io/ce_prompt_app/`!

@@ -58,12 +58,13 @@ The project maintains a zero-dependency static folder structure:
 
 ---
 
-## 🔒 Security & Configuration (Git Secrets)
+## 🔒 Security & Configuration (Passcode-Protected Private Proxy)
 
-To secure the Google Drive URL in a public repository, the following workflow is used:
-1.  **Git Ignore**: `env.js` is added to `.gitignore`. It is never pushed to the public git history.
-2.  **Deployment Injection**: In GitHub Settings under **Secrets and variables > Actions**, a secret named `PROMPT_FOLDER_URL` is configured.
-3.  **Compilation**: During push, the GitHub Actions runner writes the secret URL into the deployment bundle's `env.js` file, keeping the source code public while the deployed site remains functional.
+To keep private Google Drive documents 100% inaccessible to unauthorized public users in an open-source/public repository:
+1.  **Restricted Google Drive**: The Google Drive folder is configured with General access set to **Restricted (Private)**, completely preventing direct web access.
+2.  **Private Execution via Apps Script**: The Google Apps Script proxy runs under the owner's Google account (`Execute as: Me`), allowing it to read the restricted folder.
+3.  **Strict Folder Scope Guard**: The Apps Script strictly verifies that any requested `docId` is a child of the designated `PROMPT_FOLDER_ID`, preventing access to any other files in Google Drive.
+4.  **Client-Side Secret Passcode**: The proxy requires an `ACCESS_KEY` parameter. Users enter this passcode once on their device; it is stored in browser `localStorage` (`ce_access_key`) and sent with requests. Strangers visiting the public repository or GitHub Pages site cannot access or fetch prompt documents without the passcode.
 
 ---
 

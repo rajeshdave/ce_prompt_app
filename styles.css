@@ -66,11 +66,19 @@ body {
   line-height: 1;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.key-btn,
 .refresh-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 13px;
+  padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
   color: #4A5568;
@@ -87,16 +95,25 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+.key-btn:hover,
 .refresh-btn:hover {
   background-color: #EDF2F7;
   border-color: #A0AEC0;
   color: #2D3748;
 }
 
+.key-btn:active,
 .refresh-btn:active {
   transform: translateY(1px);
 }
 
+.key-btn.configured {
+  background-color: #F0FFF4;
+  border-color: #9AE6B4;
+  color: #22543D;
+}
+
+.key-icon,
 .refresh-icon {
   flex-shrink: 0;
   transition: transform 0.2s;
@@ -545,8 +562,13 @@ textarea:focus {
     font-size: 10px;
   }
 
+  .header-actions {
+    gap: 6px;
+  }
+
+  .key-btn,
   .refresh-btn {
-    padding: 6px 10px;
+    padding: 6px 9px;
     font-size: 12px;
     min-height: 32px;
     gap: 4px;

@@ -12,6 +12,8 @@ const copyBtn = document.getElementById("copyBtn");
 const copyBtnText = document.getElementById("copyBtnText");
 const clearBtn = document.getElementById("clearBtn");
 const loadingSkeleton = document.getElementById("loadingSkeleton");
+const keyBtn = document.getElementById("keyBtn");
+const keyBtnText = document.getElementById("keyBtnText");
 const refreshBtn = document.getElementById("refreshBtn");
 const refreshBtnText = document.getElementById("refreshBtnText");
 const syncStatus = document.getElementById("syncStatus");
@@ -52,6 +54,47 @@ function safeStorageRemove(key) {
   } catch (err) {
     console.warn(`[Storage] Failed to remove ${key}:`, err);
   }
+}
+
+// --- ACCESS PASSCODE HELPERS ---
+function getAccessKey() {
+  return safeStorageGet("ce_access_key") || "";
+}
+
+function setAccessKey(key) {
+  if (key && key.trim()) {
+    safeStorageSet("ce_access_key", key.trim());
+    updateKeyBtnDisplay(true);
+    return true;
+  } else {
+    safeStorageRemove("ce_access_key");
+    updateKeyBtnDisplay(false);
+    return false;
+  }
+}
+
+function updateKeyBtnDisplay(isSet) {
+  if (!keyBtn) return;
+  const hasKey = isSet !== undefined ? isSet : !!getAccessKey();
+  if (hasKey) {
+    keyBtn.classList.add("configured");
+    keyBtn.title = "Passcode configured (click to change or clear)";
+    if (keyBtnText) keyBtnText.textContent = "Passcode ✓";
+  } else {
+    keyBtn.classList.remove("configured");
+    keyBtn.title = "Configure Secret Access Passcode";
+    if (keyBtnText) keyBtnText.textContent = "Set Passcode";
+  }
+}
+
+function promptForAccessKey(message = "Enter your secret Access Passcode to load private Google Docs:") {
+  const current = getAccessKey();
+  const input = window.prompt(message, current);
+  if (input !== null) {
+    setAccessKey(input.trim());
+    return input.trim();
+  }
+  return null;
 }
 
 // Format relative sync time for status display
@@ -164,7 +207,7 @@ function updateClearSearchBtnVisibility() {
 
 // --- DRIVE & DOCS FETCHING ---
 
-// Fetch list of Google Doc files from a public Google Drive folder
+// Fetch list of Google Doc files from a Google Drive folder
 async function listFilesInFolder(folderId) {
   if (folderCache[folderId]) {
     return folderCache[folderId];
@@ -173,14 +216,29 @@ async function listFilesInFolder(folderId) {
   const apiUrl = window.ENV ? window.ENV.API_URL : null;
   
   if (apiUrl) {
-    const url = `${apiUrl}?action=list&folderId=${folderId}`;
+    let accessKey = getAccessKey();
+    let url = `${apiUrl}?action=list&folderId=${folderId}${accessKey ? `&key=${encodeURIComponent(accessKey)}` : ''}`;
     try {
-      const response = await fetch(url);
+      let response = await fetch(url);
       if (!response.ok) {
         console.error(`Failed to fetch folder, status: ${response.status}`);
         return [];
       }
-      const files = await response.json();
+      let files = await response.json();
+      
+      // If unauthorized, prompt for access key and retry once
+      if (files && files.error && files.error.toLowerCase().includes("unauthorized")) {
+        console.warn("Access key missing or invalid, prompting user...");
+        const newKey = promptForAccessKey("Unauthorized: Please enter your Secret Access Passcode to load prompts:");
+        if (newKey) {
+          url = `${apiUrl}?action=list&folderId=${folderId}&key=${encodeURIComponent(newKey)}`;
+          response = await fetch(url);
+          if (response.ok) {
+            files = await response.json();
+          }
+        }
+      }
+
       if (files.error) {
         console.error("API returned error:", files.error);
         return [];
@@ -242,9 +300,15 @@ async function fetchDocText(docId) {
   
   try {
     if (apiUrl) {
-      const response = await fetch(`${apiUrl}?action=get&docId=${docId}`);
+      const accessKey = getAccessKey();
+      const url = `${apiUrl}?action=get&docId=${docId}${accessKey ? `&key=${encodeURIComponent(accessKey)}` : ''}`;
+      const response = await fetch(url);
       if (response.ok) {
         text = await response.text();
+        if (text.startsWith("{") && text.includes('"error"') && text.toLowerCase().includes("unauthorized")) {
+          console.warn(`Doc ${docId} returned unauthorized error.`);
+          text = "";
+        }
       }
     } else {
       const response = await fetch(`https://docs.google.com/document/d/${docId}/export?format=txt`);
@@ -787,6 +851,7 @@ async function loadPrompts(forceRefresh = false) {
 // --- INITIALIZATION ---
 
 document.addEventListener('DOMContentLoaded', async () => {
+  updateKeyBtnDisplay();
   await loadRoles(false);
   await loadPrompts(false);
 });
@@ -802,6 +867,16 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // --- UI EVENT LISTENERS ---
+
+// Secret Access Passcode Button Action
+if (keyBtn) {
+  keyBtn.addEventListener('click', async () => {
+    const entered = promptForAccessKey("Enter your Secret Access Passcode (leave blank to clear):");
+    if (entered !== null) {
+      if (refreshBtn) refreshBtn.click();
+    }
+  });
+}
 
 // Manual Refresh Button Action
 if (refreshBtn) {
