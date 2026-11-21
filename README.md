@@ -14,6 +14,7 @@ Designed for quick mobile and desktop access, it operates entirely in the browse
 * **Quick Clear Search (`✕`)**: 1-click button inside the search box to clear filters and reset selection.
 * **Loading Spinner & Skeletons**: Visual loading indicators and skeleton placeholders during startup and file indexing.
 * **Dynamic Placeholders with Defaults**: Automatically parses parameters like `{{weeks:4}}`, `{{days:15}}`, `{{context:default context}}`, or `{{project}}` with pre-filled defaults and real-time editing.
+* **Multi-Line Big Text Block Support (`{{{...}}}`)**: Wrap multi-line content (e.g. JD context, candidate profiles, sample data) inside `{{{...}}}` to render an editable textarea pre-populated with template text and equipped with a 1-click Reset button.
 * **Role/Persona Selection**: Prepend agent instructions dynamically from `Roles.txt`.
 * **One-Click Copy**: Renders a large button to compile and copy the final formatted prompt directly to your clipboard.
 * **No Maintenance**: Purely static layout with no third-party libraries or API configurations to maintain.

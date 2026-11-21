@@ -30,9 +30,10 @@ During the design phase, the following architectural choices were made to keep t
     *   On startup or tab switch, data is loaded instantly from `localStorage` in <5ms with 0 network calls.
     *   A dedicated **Refresh** button in the header allows users to pull fresh Google Docs updates on-demand only when templates change in Drive, complete with live relative sync timestamps (e.g., "Synced 5m ago").
     *   Active user drafts (inputs, selected doc filters, search keywords) continue to be saved on every keystroke.
-4.  **Automatic Dynamic Forms with Default Values**:
-    *   Prompts loaded from Google Docs are parsed for placeholders wrapped in double curly braces (e.g. `{{project}}`, `{{weeks:4}}`, `{{days:15}}`, `{{context:default context}}`).
+4.  **Automatic Dynamic Forms with Default Values & Multi-Line Textareas**:
+    *   Prompts loaded from Google Docs are parsed for inline placeholders wrapped in double curly braces (e.g. `{{project}}`, `{{weeks:4}}`, `{{days:15}}`, `{{context:default context}}`).
     *   The app dynamically creates text inputs pre-filled with specified defaults, allowing instant customization without manual editing.
+    *   Multi-line text blocks enclosed in triple curly braces (`{{{...}}}`) are parsed as editable textareas without requiring key/value syntax. The textarea is pre-filled with the template block, dynamically sized, and includes a 1-click **Reset** button.
 5.  **Multi-Document Indexing & Filter Chips**:
     *   Fetches all Google Docs in the shared folder in parallel on startup.
     *   Replaces single dropdowns with multi-select document filter chips/checkboxes (all active by default), enabling cross-document search across all docs simultaneously.

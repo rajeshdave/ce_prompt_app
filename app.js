@@ -418,81 +418,183 @@ function persistAndRefreshDocSelection() {
   filterAndRenderPrompts(promptSearch.value);
 }
 
-// --- DYNAMIC PLACEHOLDERS PARSING ---
+// --- DYNAMIC PLACEHOLDERS & TEXTAREAS PARSING ---
 
-// Parses placeholders with support for default values (e.g. {{weeks:4}}, {{days:15}}, {{context:This is default context}}, {{project}})
-function parsePlaceholders(text) {
-  const rawMatches = text.match(/{{[^{}]+}}/g) || [];
-  const placeholderMap = new Map();
-  
-  rawMatches.forEach(match => {
-    const inner = match.slice(2, -2);
-    const colonIdx = inner.indexOf(':');
-    const key = (colonIdx !== -1 ? inner.substring(0, colonIdx) : inner).trim();
-    const defaultVal = colonIdx !== -1 ? inner.substring(colonIdx + 1).trim() : "";
-    
-    if (!key) return;
-    const keyLower = key.toLowerCase();
-    if (!placeholderMap.has(keyLower)) {
-      placeholderMap.set(keyLower, { key, defaultVal });
-    } else if (defaultVal && !placeholderMap.get(keyLower).defaultVal) {
-      placeholderMap.set(keyLower, { key, defaultVal });
+// Extract title/label from the first line of a big text block
+function extractBlockLabel(content, index, total) {
+  const lines = (content || '').trim().split('\n');
+  const firstLine = lines.length > 0 ? lines[0].replace(/^[*#_`\s-]+|[*#_`\s-]+$/g, '').trim() : '';
+  if (firstLine && firstLine.length <= 40) {
+    return total > 1 ? `Block ${index + 1} (${firstLine})` : firstLine;
+  } else if (firstLine) {
+    const short = firstLine.substring(0, 32).trim() + '...';
+    return total > 1 ? `Block ${index + 1} (${short})` : short;
+  }
+  return total > 1 ? `Text Block ${index + 1}` : `Text Block`;
+}
+
+// Parses both inline {{key:default}} inputs and big text {{{content}}} textareas in document order
+function parseAllPlaceholders(text) {
+  if (!text) return [];
+  // Triple braces: {{{ ... }}} (multi-line textarea blocks)
+  // Double braces: {{ ... }} (inline input placeholders, not preceded/followed by { or })
+  const regex = /{{{([\s\S]*?)}}}|(?<!{){{([^{}]+)}}(?!})/g;
+  const items = [];
+  const seenInputKeys = new Set();
+  let match;
+  let blockIndex = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match[1] !== undefined) {
+      // Triple braces: big multi-line textarea block
+      items.push({
+        type: 'textarea',
+        rawMatch: match[0],
+        index: blockIndex++,
+        defaultVal: match[1].trim()
+      });
+    } else if (match[2] !== undefined) {
+      // Double braces: inline text input placeholder
+      const inner = match[2];
+      const colonIdx = inner.indexOf(':');
+      const key = (colonIdx !== -1 ? inner.substring(0, colonIdx) : inner).trim();
+      const defaultVal = colonIdx !== -1 ? inner.substring(colonIdx + 1).trim() : "";
+      
+      if (!key) continue;
+      const keyLower = key.toLowerCase();
+      
+      if (seenInputKeys.has(keyLower)) {
+        const existing = items.find(it => it.type === 'input' && it.keyLower === keyLower);
+        if (existing && !existing.defaultVal && defaultVal) {
+          existing.defaultVal = defaultVal;
+        }
+        continue;
+      }
+      
+      seenInputKeys.add(keyLower);
+      items.push({
+        type: 'input',
+        rawMatch: match[0],
+        key,
+        keyLower,
+        defaultVal
+      });
     }
-  });
-  
-  return placeholderMap;
+  }
+
+  return items;
 }
 
 function updateDynamicInputs() {
   const text = selectedPromptText || "";
-  const placeholderMap = parsePlaceholders(text);
+  const placeholderItems = parseAllPlaceholders(text);
 
   dynamicInputsContainer.innerHTML = "";
   
-  if (placeholderMap.size === 0) {
+  if (placeholderItems.length === 0) {
     dynamicInputsContainer.style.display = "none";
     return;
   }
   
   dynamicInputsContainer.style.display = "block";
+  const promptTitle = (promptSearch ? promptSearch.value.trim() : "") || "prompt";
+  const totalTextareas = placeholderItems.filter(it => it.type === 'textarea').length;
 
-  placeholderMap.forEach(({ key, defaultVal }, keyLower) => {
-    const row = document.createElement("div");
-    row.className = "dynamic-input-row";
+  placeholderItems.forEach(item => {
+    if (item.type === 'input') {
+      const { key, keyLower, defaultVal } = item;
+      const row = document.createElement("div");
+      row.className = "dynamic-input-row";
 
-    const label = document.createElement("label");
-    label.textContent = key.charAt(0).toUpperCase() + key.slice(1) + ":";
-    label.title = key;
+      const label = document.createElement("label");
+      label.textContent = key.charAt(0).toUpperCase() + key.slice(1) + ":";
+      label.title = key;
 
-    const input = document.createElement("input");
-    input.type = "text";
-    input.dataset.key = key;
-    input.dataset.defaultVal = defaultVal;
-    
-    // Check cached value vs default value
-    const cachedVal = safeStorageGet(`ce_val_${keyLower}`);
-    if (cachedVal !== null) {
-      input.value = cachedVal;
-    } else if (defaultVal !== "") {
-      input.value = defaultVal;
-    } else if (keyLower === "weeks") {
-      input.value = "1";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.dataset.key = key;
+      input.dataset.defaultVal = defaultVal;
+      
+      // Check cached value vs default value
+      const cachedVal = safeStorageGet(`ce_val_${keyLower}`);
+      if (cachedVal !== null) {
+        input.value = cachedVal;
+      } else if (defaultVal !== "") {
+        input.value = defaultVal;
+      } else if (keyLower === "weeks") {
+        input.value = "1";
+      }
+
+      if (defaultVal) {
+        input.placeholder = `Default: ${defaultVal}`;
+      } else {
+        input.placeholder = `Enter ${key}...`;
+      }
+
+      input.addEventListener('input', () => {
+        safeStorageSet(`ce_val_${keyLower}`, input.value);
+        updateCombinedPrompt();
+      });
+
+      row.appendChild(label);
+      row.appendChild(input);
+      dynamicInputsContainer.appendChild(row);
+
+    } else if (item.type === 'textarea') {
+      const { index, defaultVal } = item;
+      const row = document.createElement("div");
+      row.className = "dynamic-textarea-row";
+
+      const headerDiv = document.createElement("div");
+      headerDiv.className = "dynamic-textarea-header";
+
+      const blockLabel = extractBlockLabel(defaultVal, index, totalTextareas);
+      const label = document.createElement("label");
+      label.textContent = `📝 ${blockLabel}:`;
+      label.title = defaultVal.split('\n')[0] || blockLabel;
+
+      const resetBtn = document.createElement("button");
+      resetBtn.type = "button";
+      resetBtn.className = "textarea-reset-btn";
+      resetBtn.textContent = "Reset";
+      resetBtn.title = "Reset this block to original template content";
+
+      headerDiv.appendChild(label);
+      headerDiv.appendChild(resetBtn);
+
+      const textarea = document.createElement("textarea");
+      const storageKey = `ce_val_ta_${encodeURIComponent(promptTitle)}_${index}`;
+      textarea.dataset.storageKey = storageKey;
+      textarea.dataset.index = index;
+      textarea.dataset.defaultVal = defaultVal;
+
+      // Dynamic rows based on content length (between 4 and 12 rows)
+      const lineCount = (defaultVal.match(/\n/g) || []).length + 1;
+      textarea.rows = Math.min(Math.max(lineCount + 1, 4), 12);
+
+      // Check cached value vs template default value
+      const cachedVal = safeStorageGet(storageKey);
+      if (cachedVal !== null) {
+        textarea.value = cachedVal;
+      } else {
+        textarea.value = defaultVal;
+      }
+
+      textarea.addEventListener('input', () => {
+        safeStorageSet(storageKey, textarea.value);
+        updateCombinedPrompt();
+      });
+
+      resetBtn.addEventListener('click', () => {
+        textarea.value = defaultVal;
+        safeStorageRemove(storageKey);
+        updateCombinedPrompt();
+      });
+
+      row.appendChild(headerDiv);
+      row.appendChild(textarea);
+      dynamicInputsContainer.appendChild(row);
     }
-
-    if (defaultVal) {
-      input.placeholder = `Default: ${defaultVal}`;
-    } else {
-      input.placeholder = `Enter ${key}...`;
-    }
-
-    input.addEventListener('input', () => {
-      safeStorageSet(`ce_val_${keyLower}`, input.value);
-      updateCombinedPrompt();
-    });
-
-    row.appendChild(label);
-    row.appendChild(input);
-    dynamicInputsContainer.appendChild(row);
   });
 }
 
@@ -503,27 +605,57 @@ function getBaseCombinedWithoutManual() {
   let lines = [];
   if (selectedRole) lines.push(`Act as ${selectedRole}`);
   if (selectedPrompt) lines.push(selectedPrompt);
-  let combined = lines.join('\n');
-  
+  const basePrompt = lines.join('\n');
+
+  // Collect current input values
   const inputs = dynamicInputsContainer.querySelectorAll("input");
+  const inputMap = new Map();
   inputs.forEach(input => {
     const key = input.dataset.key || "";
+    const keyLower = key.toLowerCase();
     const defaultVal = input.dataset.defaultVal || "";
-    let value = input.value.trim();
-
-    if (key.toLowerCase() === "weeks") {
-      const v = parseInt(value || defaultVal || "1", 10) || 1;
-      value = v === 1 ? '1 week' : `${v} weeks`;
-    } else if (value === "") {
-      value = defaultVal ? defaultVal : `{{${key}}}`;
-    }
-
-    if (key) {
-      const regex = new RegExp('\\{\\{\\s*' + escapeRegex(key) + '(?:\\s*:[^{}]*)?\\s*\\}\\}', 'gi');
-      combined = combined.replace(regex, () => value);
-    }
+    inputMap.set(keyLower, {
+      key,
+      defaultVal,
+      value: input.value.trim()
+    });
   });
-  
+
+  // Collect current textarea values
+  const textareas = dynamicInputsContainer.querySelectorAll("textarea");
+  let textareaIndex = 0;
+
+  // Single-pass replacement for both {{{...}}} and {{...}}
+  const regex = /{{{([\s\S]*?)}}}|(?<!{){{([^{}]+)}}(?!})/g;
+  const combined = basePrompt.replace(regex, (match, tripleContent, doubleContent) => {
+    if (tripleContent !== undefined) {
+      if (textareaIndex < textareas.length) {
+        return textareas[textareaIndex++].value;
+      }
+      return tripleContent.trim();
+    } else if (doubleContent !== undefined) {
+      const colonIdx = doubleContent.indexOf(':');
+      const key = (colonIdx !== -1 ? doubleContent.substring(0, colonIdx) : doubleContent).trim();
+      const defaultVal = colonIdx !== -1 ? doubleContent.substring(colonIdx + 1).trim() : "";
+      const keyLower = key.toLowerCase();
+
+      const item = inputMap.get(keyLower);
+      if (item) {
+        let value = item.value;
+        if (keyLower === "weeks") {
+          const v = parseInt(value || defaultVal || "1", 10) || 1;
+          return v === 1 ? '1 week' : `${v} weeks`;
+        }
+        if (value === "") {
+          return defaultVal ? defaultVal : `{{${key}}}`;
+        }
+        return value;
+      }
+      return defaultVal ? defaultVal : match;
+    }
+    return match;
+  });
+
   return combined;
 }
 
@@ -974,12 +1106,19 @@ if (clearSearchBtn) {
     promptBox.value = "";
     promptBox.dataset.customText = "";
     
-    // Clear placeholder values
+    // Clear placeholder inputs and textareas
     const inputs = dynamicInputsContainer.querySelectorAll("input");
     inputs.forEach(input => {
       const key = input.dataset.key || "";
       if (key) {
         safeStorageRemove(`ce_val_${key.toLowerCase()}`);
+      }
+    });
+
+    const textareas = dynamicInputsContainer.querySelectorAll("textarea");
+    textareas.forEach(ta => {
+      if (ta.dataset.storageKey) {
+        safeStorageRemove(ta.dataset.storageKey);
       }
     });
     
@@ -1051,12 +1190,19 @@ clearBtn.addEventListener("click", () => {
   promptBox.value = "";
   promptBox.dataset.customText = "";
   
-  // Clear placeholder values in localStorage
+  // Clear placeholder values and textareas in localStorage
   const inputs = dynamicInputsContainer.querySelectorAll("input");
   inputs.forEach(input => {
     const key = input.dataset.key || "";
     if (key) {
       safeStorageRemove(`ce_val_${key.toLowerCase()}`);
+    }
+  });
+
+  const textareas = dynamicInputsContainer.querySelectorAll("textarea");
+  textareas.forEach(ta => {
+    if (ta.dataset.storageKey) {
+      safeStorageRemove(ta.dataset.storageKey);
     }
   });
   
