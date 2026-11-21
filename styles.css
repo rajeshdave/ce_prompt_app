@@ -399,7 +399,7 @@ select.form-input {
   padding: 0 2px;
 }
 
-/* --- DYNAMIC PLACEHOLDERS --- */
+/* --- DYNAMIC PLACEHOLDERS & TEXT AREAS --- */
 .dynamic-inputs-area {
   background-color: #F7FAFC;
   border-radius: 8px;
@@ -439,6 +439,72 @@ select.form-input {
 }
 
 .dynamic-input-row input:focus {
+  border-color: #3182CE;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+}
+
+.dynamic-textarea-row {
+  display: flex;
+  flex-direction: column;
+  margin: 10px 10px 14px 10px;
+  gap: 6px;
+}
+
+.dynamic-textarea-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dynamic-textarea-header label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4A5568;
+  margin-bottom: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.textarea-reset-btn {
+  background: none;
+  border: 1px solid #CBD5E0;
+  border-radius: 4px;
+  color: #718096;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.textarea-reset-btn:hover {
+  background-color: #EDF2F7;
+  color: #2D3748;
+  border-color: #A0AEC0;
+}
+
+.dynamic-textarea-row textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 320px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1.5px solid #CBD5E0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+  resize: vertical;
+  background-color: #FFFFFF;
+  color: #2D3748;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dynamic-textarea-row textarea:focus {
   border-color: #3182CE;
   box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
 }
